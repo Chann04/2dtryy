@@ -5,7 +5,7 @@ export default function ShopPage({ clothingTypes, onSelect }) {
   return (
     <div className="shop-page">
       <section className="shop-hero">
-        <h2>Premium Tailor Collections</h2>
+        <h2>Djacksman tailor</h2>
         <p>Choose your preferred clothing type to customize</p>
       </section>
 
