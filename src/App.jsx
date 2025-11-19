@@ -5,10 +5,10 @@ import CustomizationPage from "./pages/CustomizationPage";
 import ReviewPage from "./pages/ReviewPage";
 
 const CLOTHING_TYPES = [
-  { id: "coat", label: "Coat", image: "🧥", desc: "Classic Dress Coat" },
-  { id: "barong", label: "Barong", image: "👔", desc: "Traditional Barong" },
-  { id: "suit", label: "Suit", image: "🎩", desc: "Complete Suit" },
-  { id: "pants", label: "Pants", image: "👖", desc: "Formal Pants" },
+  { id: "coat", label: "Coat", image: "", desc: "Classic Dress Coat" },
+  { id: "barong", label: "Barong", image: "", desc: "Traditional Barong" },
+  { id: "suit", label: "Suit", image: "", desc: "Complete Suit" },
+  { id: "pants", label: "Pants", image: "", desc: "Formal Pants" },
 ];
 
 const FABRIC_TYPES = [
@@ -71,8 +71,8 @@ export default function App() {
       <header className="app-header">
         <div className="header-container">
           <div className="logo">
-            <span className="logo-icon">✨</span>
-            <h1>Suit Tailors</h1>
+            <span className="logo-icon"></span>
+            <h1>Customization</h1>
           </div>
           <nav className="nav-links">
             <button

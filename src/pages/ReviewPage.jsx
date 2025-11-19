@@ -112,7 +112,7 @@ export default function ReviewPage({
 
           {/* Fabric Sample Upload */}
           <div className="upload-card">
-            <h4>📸 Fabric Sample</h4>
+            <h4>Fabric Sample</h4>
             <p className="upload-desc">
               Upload a picture of the fabric you want to use
             </p>
@@ -120,7 +120,7 @@ export default function ReviewPage({
               className="upload-btn"
               onClick={() => fabricFileRef.current.click()}
             >
-              {fabricSampleFile ? "✅ Fabric Uploaded" : "📤 Upload Fabric"}
+              {fabricSampleFile ? " Fabric Uploaded" : " Upload Fabric"}
             </button>
             <input
               ref={fabricFileRef}
@@ -139,7 +139,7 @@ export default function ReviewPage({
 
           {/* Customization Image Upload */}
           <div className="upload-card">
-            <h4>🎨 Customization Details</h4>
+            <h4>Customization Details</h4>
             <p className="upload-desc">
               Upload reference images for customization details
             </p>
@@ -148,8 +148,8 @@ export default function ReviewPage({
               onClick={() => customImageFileRef.current.click()}
             >
               {customizationImageFile
-                ? "✅ Details Uploaded"
-                : "📤 Upload Details"}
+                ? "Details Uploaded"
+                : "Upload Details"}
             </button>
             <input
               ref={customImageFileRef}
