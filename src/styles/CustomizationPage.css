@@ -27,46 +27,70 @@
   gap: 20px;
 }
 
-.preview-panel h2 {
+.preview-header h2 {
   font-size: 1.8rem;
   color: var(--c-ink);
   margin: 0;
   font-weight: 700;
 }
 
-.clothing-preview {
+.preview-header p {
+  margin: 4px 0 0;
+  color: rgba(50,45,41,0.65);
+}
+
+.ai-preview-box {
   flex: 1;
   border: 1px dashed var(--c-muted);
-  border-radius: 8px;
+  border-radius: 12px;
   background: linear-gradient(180deg, #fff, var(--c-soft));
-  padding: 20px;
   min-height: 450px;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
   overflow: hidden;
 }
 
-#svg-preview-wrapper {
+.ai-preview-box img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+}
+
+.preview-placeholder {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 10px;
+  color: rgba(50,45,41,0.7);
+  text-align: center;
 }
 
-#svg-preview-wrapper svg {
-  max-width: 90%;
-  max-height: 90%;
-  width: auto;
-  height: auto;
+.preview-placeholder span {
+  font-size: 2.5rem;
 }
 
-.clothing-preview canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.generate-btn {
+  flex: 1;
+  padding: 14px 24px;
+  background: linear-gradient(90deg, #00c6ff, #0072ff);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .download-btn {
@@ -201,7 +225,7 @@
 /* Fabric Grid */
 .fabric-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -237,6 +261,67 @@
 .fabric-desc {
   font-size: 0.85rem;
   color: rgba(50,45,41,0.68);
+}
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.variant-card {
+  border: 1px solid var(--c-muted);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.variant-card.active {
+  border-color: transparent;
+  background: linear-gradient(120deg, rgba(102, 126, 234, 0.15), rgba(114, 59, 61, 0.15));
+  box-shadow: 0 8px 20px rgba(114,59,61,0.09);
+}
+
+.variant-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--c-ink);
+}
+
+.variant-detail {
+  font-size: 0.9rem;
+  color: rgba(50,45,41,0.68);
+}
+
+.prompt-textarea {
+  min-height: 100px;
+  border-radius: 10px;
+  border: 1px solid var(--c-muted);
+  padding: 14px;
+  resize: vertical;
+  font-size: 1rem;
+  font-family: "Inter", sans-serif;
+}
+
+.helper-text {
+  font-size: 0.85rem;
+  color: rgba(50,45,41,0.68);
+}
+
+.prompt-chip {
+  background: rgba(50,45,41,0.05);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.95rem;
+  color: rgba(50,45,41,0.8);
+}
+
+.error-text {
+  color: #b83232;
+  font-size: 0.9rem;
 }
 
 /* Pattern Grid */

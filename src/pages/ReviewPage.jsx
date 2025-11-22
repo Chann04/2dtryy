@@ -1,8 +1,8 @@
-import React, { useRef } from "react";
-import SvgClothing from "../components/SvgClothing";
+import React, { useMemo, useRef } from "react";
 import "../styles/ReviewPage.css";
 
 export default function ReviewPage({
+  catalog = [],
   customization,
   fabricSampleFile,
   customizationImageFile,
@@ -13,6 +13,12 @@ export default function ReviewPage({
 }) {
   const fabricFileRef = useRef(null);
   const customImageFileRef = useRef(null);
+
+  const { activeCategory, activeVariant } = useMemo(() => {
+    const category = catalog.find((item) => item.id === customization.clothingType);
+    const variant = category?.variants?.find((v) => v.id === customization.variantId);
+    return { activeCategory: category, activeVariant: variant };
+  }, [catalog, customization.clothingType, customization.variantId]);
 
   const handleFabricUpload = (e) => {
     const file = e.target.files[0];
@@ -36,13 +42,6 @@ export default function ReviewPage({
     ? URL.createObjectURL(customizationImageFile)
     : null;
 
-  const clothingDescriptions = {
-    coat: "Classic dress coat with premium tailoring",
-    barong: "Traditional barong with detailed embroidery",
-    suit: "Complete suit with jacket and pants",
-    pants: "Formal pants with perfect fit",
-  };
-
   return (
     <div className="review-page">
       <h2>Review Your Order</h2>
@@ -52,13 +51,16 @@ export default function ReviewPage({
         <div className="review-summary">
           <h3>Your Customization</h3>
           <div className="preview-box">
-            <SvgClothing
-              type={customization.clothingType}
-              color={customization.color}
-              pattern={customization.pattern}
-              width={280}
-              height={400}
-            />
+            {customization.aiImageUrl ? (
+              <img src={customization.aiImageUrl} alt="AI generated garment preview" />
+            ) : (
+              <div className="preview-fallback">
+                <span role="img" aria-label="sparkles">
+                  ✨
+                </span>
+                <p>No AI image generated yet.</p>
+              </div>
+            )}
           </div>
 
           <div className="specs-list">
@@ -68,10 +70,16 @@ export default function ReviewPage({
                 {customization.clothingType.toUpperCase()}
               </span>
             </div>
+            {activeVariant && (
+              <div className="spec-item">
+                <span className="spec-label">Variant:</span>
+                <span className="spec-value">{activeVariant.name}</span>
+              </div>
+            )}
             <div className="spec-item">
               <span className="spec-label">Description:</span>
               <span className="spec-value">
-                {clothingDescriptions[customization.clothingType]}
+                {activeVariant?.detail || activeCategory?.desc}
               </span>
             </div>
             <div className="spec-item">
@@ -103,6 +111,18 @@ export default function ReviewPage({
                   customization.clothingFit.slice(1)}
               </span>
             </div>
+            {customization.generatedPrompt && (
+              <div className="spec-item prompt-spec">
+                <span className="spec-label">AI Prompt:</span>
+                <span className="spec-value">{customization.generatedPrompt}</span>
+              </div>
+            )}
+            {customization.customPrompt && (
+              <div className="spec-item">
+                <span className="spec-label">Designer Notes:</span>
+                <span className="spec-value">{customization.customPrompt}</span>
+              </div>
+            )}
           </div>
         </div>
 
