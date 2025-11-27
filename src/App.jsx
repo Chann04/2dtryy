@@ -8,7 +8,7 @@ const CLOTHING_CATALOG = [
   {
     id: "coat",
     label: "Coats",
-    image: "🧥",
+    image: "",
     desc: "Layered outerwear silhouettes",
     variants: [
       {
@@ -40,7 +40,7 @@ const CLOTHING_CATALOG = [
   {
     id: "barong",
     label: "Barongs",
-    image: "👔",
+    image: "",
     desc: "Traditional Filipino formalwear",
     variants: [
       {
@@ -48,7 +48,7 @@ const CLOTHING_CATALOG = [
         name: "Classic Piña Barong",
         detail: "Sheer piña fabric, hand embroidery",
         prompt: "sheer pina barong tagalog with ornate kalado embroidery and translucent texture",
-        fabrics: ["piña", "jusi", "organza"],
+        fabrics: ["piña","jusi", "organza"],
         defaultColor: "#f6e8c3",
       },
       {
@@ -64,7 +64,7 @@ const CLOTHING_CATALOG = [
   {
     id: "suit",
     label: "Suits",
-    image: "🤵",
+    image: "",
     desc: "Full tailored ensembles",
     variants: [
       {
@@ -96,7 +96,7 @@ const CLOTHING_CATALOG = [
   {
     id: "pants",
     label: "Trousers",
-    image: "👖",
+    image: "",
     desc: "Tailored bottoms",
     variants: [
       {

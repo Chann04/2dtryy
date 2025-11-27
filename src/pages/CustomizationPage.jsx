@@ -154,7 +154,7 @@ export default function CustomizationPage({
             ) : (
               <div className="preview-placeholder">
                 <span role="img" aria-label="sparkles">
-                  ✨
+                  
                 </span>
                 <p>No AI image yet. Select options then hit “Generate Preview”.</p>
               </div>
@@ -162,10 +162,10 @@ export default function CustomizationPage({
           </div>
           <div className="preview-actions">
             <button className="generate-btn" onClick={generateImage} disabled={isGenerating}>
-              {isGenerating ? "Generating..." : "⚡ Generate Preview"}
+              {isGenerating ? "Generating..." : " Generate Preview"}
             </button>
             <button className="download-btn" onClick={handleDownloadImage} disabled={!aiImageUrl}>
-              📥 Download Image
+               Download Image
             </button>
           </div>
           {generatedPrompt && (
@@ -296,7 +296,7 @@ export default function CustomizationPage({
             </small>
           </div>
 
-          {/* Action Buttons */}
+          
           <div className="action-buttons">
             <button className="btn-back" onClick={onBack}>
               ← Back
