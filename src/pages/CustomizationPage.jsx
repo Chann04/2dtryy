@@ -60,13 +60,78 @@ export default function CustomizationPage({
     }
   };
 
+  // Convert hex color to descriptive color name
+  const hexToColorName = (hex) => {
+    // Remove # if present
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Calculate brightness
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    
+    // Common color mappings
+    const colorMap = {
+      '#1a1a1a': 'deep black',
+      '#2b6cb0': 'navy blue',
+      '#8b0000': 'dark red',
+      '#228b22': 'forest green',
+      '#4a4a4a': 'charcoal gray',
+      '#d69e2e': 'golden yellow',
+      '#f6e8c3': 'cream',
+      '#000000': 'black',
+      '#ffffff': 'white',
+      '#ff0000': 'red',
+      '#00ff00': 'green',
+      '#0000ff': 'blue',
+    };
+    
+    // Check if we have a direct mapping
+    if (colorMap[`#${hex}`]) {
+      return colorMap[`#${hex}`];
+    }
+    
+    // Determine color based on RGB values
+    if (brightness < 50) return 'black';
+    if (brightness > 250) return 'white';
+    
+    // Determine dominant color
+    if (r > g && r > b) {
+      if (r > 200) return 'bright red';
+      if (r > 150) return 'red';
+      return 'dark red';
+    }
+    if (g > r && g > b) {
+      if (g > 200) return 'bright green';
+      if (g > 150) return 'green';
+      return 'dark green';
+    }
+    if (b > r && b > g) {
+      if (b > 200) return 'bright blue';
+      if (b > 150) return 'blue';
+      return 'dark blue';
+    }
+    if (r === g && g === b) {
+      if (brightness > 200) return 'light gray';
+      if (brightness > 100) return 'gray';
+      return 'dark gray';
+    }
+    
+    // Fallback to brightness-based description
+    if (brightness > 200) return 'light colored';
+    if (brightness > 100) return 'medium colored';
+    return 'dark colored';
+  };
+
   const buildPrompt = () => {
     const fabricName = fabricLibrary[fabricType]?.name || fabricType;
     const basePrompt = activeVariant?.prompt || `${activeCategory?.label} garment`;
     const patternDescriptor = pattern === "solid" ? "smooth finish" : `${pattern} pattern`;
     const fitDescriptor = clothingFit ? `${clothingFit} fit` : "";
-    const colorDescriptor = color ? `color ${color}` : "";
-    return `High fidelity studio photo of a ${activeVariant?.name || activeCategory?.label} with ${fitDescriptor}, ${basePrompt}, crafted from ${fabricName} featuring ${patternDescriptor}, dyed in ${colorDescriptor}. ${customPrompt}`.trim();
+    const colorName = color ? hexToColorName(color) : "";
+    const colorDescriptor = colorName ? `in ${colorName} color` : "";
+    return `Professional product photography of a ${activeVariant?.name || activeCategory?.label} with ${fitDescriptor}, ${basePrompt}, crafted from ${fabricName} featuring ${patternDescriptor}, ${colorDescriptor}. Displayed on a mannequin or hanger, no person visible, clean studio background, focus on the garment details. ${customPrompt}`.trim();
   };
 
   const generateImage = async () => {
@@ -74,41 +139,78 @@ export default function CustomizationPage({
     setGeneratedPrompt(prompt);
     setIsGenerating(true);
     setError("");
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?bust=${Date.now()}`;
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-
-    if (!apiKey) {
-      setAiImageUrl(fallbackUrl);
-      setIsGenerating(false);
-      return;
-    }
+    
+    // Try OpenAI DALL-E first, then fallback to faster free service
+    const openAiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
     try {
-      const response = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt,
-          size: "1024x1024",
-          quality: "high",
-        }),
-      });
+      // Option 1: Use OpenAI DALL-E if API key is available (fastest, ~10-20 seconds)
+      if (openAiKey) {
+        const response = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openAiKey}`,
+          },
+          body: JSON.stringify({
+            model: "dall-e-3",
+            prompt: prompt,
+            n: 1,
+            size: "1024x1024",
+            quality: "standard",
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to call OpenAI image API");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data && data.data[0] && data.data[0].url) {
+            setAiImageUrl(data.data[0].url);
+            setIsGenerating(false);
+            return;
+          }
+        } else {
+          // If OpenAI fails, fall through to free service
+          console.warn("OpenAI DALL-E failed, using fallback service");
+        }
       }
-      const data = await response.json();
-      const imageUrl = data?.data?.[0]?.url;
-      setAiImageUrl(imageUrl || fallbackUrl);
-    } catch (err) {
-      console.error(err);
+
+      // Option 2: Use free image generation service with timeout
+      // Pollinations.ai can be slow, so we set a timeout and show the image URL immediately
+      const timestamp = Date.now();
+      const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${timestamp}`;
+      
+      console.log("Generating image with URL:", fallbackUrl);
+      
+      // Set the URL immediately - the image will load asynchronously
       setAiImageUrl(fallbackUrl);
-      setError("Using sample generator while OpenAI preview is unavailable.");
-    } finally {
+      
+      // Set a timeout to stop the loading state after 30 seconds
+      // The image will still try to load, but we won't show "Generating..." forever
+      const timeoutId = setTimeout(() => {
+        setIsGenerating(false);
+        setError("Image generation is taking longer than expected. The image may still appear when ready (can take 1-2 minutes). For faster generation, add an OpenAI API key to your .env file.");
+      }, 30000);
+      
+      // Clear timeout if image loads successfully
+      const img = new Image();
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        setIsGenerating(false);
+        setError("");
+      };
+      img.onerror = () => {
+        clearTimeout(timeoutId);
+        // Image will still try to load via the img tag's onError handler
+      };
+      img.src = fallbackUrl;
+      
+    } catch (err) {
+      console.error("Image generation error:", err);
+      setError(
+        err.message || 
+        "Image generation is taking too long or failed. Please try again or add an OpenAI API key (VITE_OPENAI_API_KEY) for faster, more reliable generation."
+      );
+      setAiImageUrl("");
       setIsGenerating(false);
     }
   };
@@ -146,17 +248,31 @@ export default function CustomizationPage({
         <div className="preview-panel">
           <div className="preview-header">
             <h2>AI Photo Preview</h2>
-            <p>Generate a photorealistic sample powered by OpenAI or the free fallback engine.</p>
+            <p>Generate a photorealistic sample powered by AI image generation.</p>
           </div>
           <div className="ai-preview-box">
-            {aiImageUrl ? (
-              <img src={aiImageUrl} alt="AI generated garment preview" />
+            {isGenerating ? (
+              <div className="preview-placeholder">
+                <span role="img" aria-label="sparkles">✨</span>
+                <p>Generating image... Please wait.</p>
+              </div>
+            ) : aiImageUrl ? (
+              <img 
+                src={aiImageUrl} 
+                alt="AI generated garment preview" 
+                onError={(e) => {
+                  console.error("Image failed to load:", aiImageUrl);
+                  setError("Image failed to load. Please try generating again.");
+                  setAiImageUrl("");
+                }}
+                onLoad={() => {
+                  setError("");
+                }}
+              />
             ) : (
               <div className="preview-placeholder">
-                <span role="img" aria-label="sparkles">
-                  
-                </span>
-                <p>No AI image yet. Select options then hit “Generate Preview”.</p>
+                <span role="img" aria-label="sparkles">✨</span>
+                <p>No AI image yet. Select options then hit "Generate Preview".</p>
               </div>
             )}
           </div>
