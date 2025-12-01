@@ -14,6 +14,7 @@ export default function CustomizationPage({
   const defaultCategoryId = selectedClothing || initialCustomization.clothingType || catalog[0]?.id;
   const [clothingType, setClothingType] = useState(defaultCategoryId);
   const [variantId, setVariantId] = useState(initialCustomization.variantId || "");
+  const [gender, setGender] = useState(initialCustomization.gender || "unisex");
   const [fabricType, setFabricType] = useState(initialCustomization.fabricType);
   const [pattern, setPattern] = useState(initialCustomization.pattern);
   const [color, setColor] = useState(initialCustomization.color);
@@ -126,12 +127,22 @@ export default function CustomizationPage({
 
   const buildPrompt = () => {
     const fabricName = fabricLibrary[fabricType]?.name || fabricType;
+    const fabricDesc = fabricLibrary[fabricType]?.desc || "";
     const basePrompt = activeVariant?.prompt || `${activeCategory?.label} garment`;
     const patternDescriptor = pattern === "solid" ? "smooth finish" : `${pattern} pattern`;
     const fitDescriptor = clothingFit ? `${clothingFit} fit` : "";
+    const genderDescriptor =
+      gender === "male"
+        ? "menswear tailoring"
+        : gender === "female"
+        ? "womenswear tailoring"
+        : "unisex tailoring";
     const colorName = color ? hexToColorName(color) : "";
     const colorDescriptor = colorName ? `in ${colorName} color` : "";
-    return `Professional product photography of a ${activeVariant?.name || activeCategory?.label} with ${fitDescriptor}, ${basePrompt}, crafted from ${fabricName} featuring ${patternDescriptor}, ${colorDescriptor}. Displayed on a mannequin or hanger, no person visible, clean studio background, focus on the garment details. ${customPrompt}`.trim();
+    const fabricDescriptor = fabricDesc
+      ? `crafted from ${fabricName.toLowerCase()} (${fabricDesc})`
+      : `crafted from ${fabricName.toLowerCase()}`;
+    return `Professional product photography of a ${activeVariant?.name || activeCategory?.label} with ${fitDescriptor}, ${genderDescriptor}, ${basePrompt}, ${fabricDescriptor}, featuring ${patternDescriptor}, ${colorDescriptor}. Fabric texture must clearly show ${fabricName.toLowerCase()} qualities. Displayed on a mannequin or hanger, no person visible, clean studio background, focus on the garment details. ${customPrompt}`.trim();
   };
 
   const generateImage = async () => {
@@ -229,6 +240,7 @@ export default function CustomizationPage({
     onSave({
       clothingType,
       variantId: activeVariant?.id,
+      gender,
       fabricType,
       pattern,
       color,
@@ -312,22 +324,24 @@ export default function CustomizationPage({
             </div>
           </div>
 
-          {/* Variant Selection */}
-          <div className="control-section">
-            <label className="control-label">Style Variants</label>
-            <div className="variant-grid">
-              {variants.map((variant) => (
-                <button
-                  key={variant.id}
-                  className={`variant-card ${variantId === variant.id ? "active" : ""}`}
-                  onClick={() => handleVariantSelect(variant)}
-                >
-                  <div className="variant-name">{variant.name}</div>
-                  <div className="variant-detail">{variant.detail}</div>
-                </button>
-              ))}
+          {/* Variant Selection (hidden when only one variant, e.g., Barong) */}
+          {variants.length > 1 && (
+            <div className="control-section">
+              <label className="control-label">Style Variants</label>
+              <div className="variant-grid">
+                {variants.map((variant) => (
+                  <button
+                    key={variant.id}
+                    className={`variant-card ${variantId === variant.id ? "active" : ""}`}
+                    onClick={() => handleVariantSelect(variant)}
+                  >
+                    <div className="variant-name">{variant.name}</div>
+                    <div className="variant-detail">{variant.detail}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Clothing Fit */}
           <div className="control-section">
@@ -340,6 +354,22 @@ export default function CustomizationPage({
                   onClick={() => setClothingFit(fit)}
                 >
                   {fit.charAt(0).toUpperCase() + fit.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Gender */}
+          <div className="control-section">
+            <label className="control-label">Gender</label>
+            <div className="button-group">
+              {["male", "female", "unisex"].map((g) => (
+                <button
+                  key={g}
+                  className={`model-btn ${gender === g ? "active" : ""}`}
+                  onClick={() => setGender(g)}
+                >
+                  {g.charAt(0).toUpperCase() + g.slice(1)}
                 </button>
               ))}
             </div>

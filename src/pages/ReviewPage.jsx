@@ -105,6 +105,15 @@ export default function ReviewPage({
               </span>
             </div>
             <div className="spec-item">
+              <span className="spec-label">Gender:</span>
+              <span className="spec-value">
+                {customization.gender
+                  ? customization.gender.charAt(0).toUpperCase() +
+                    customization.gender.slice(1)
+                  : "Unisex"}
+              </span>
+            </div>
+            <div className="spec-item">
               <span className="spec-label">Fit:</span>
               <span className="spec-value">
                 {customization.clothingFit.charAt(0).toUpperCase() +

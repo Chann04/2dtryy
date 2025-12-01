@@ -47,17 +47,10 @@ const CLOTHING_CATALOG = [
         id: "barong_classic",
         name: "Classic Piña Barong",
         detail: "Sheer piña fabric, hand embroidery",
-        prompt: "sheer pina barong tagalog with ornate kalado embroidery and translucent texture",
-        fabrics: ["piña","jusi", "organza"],
+        prompt:
+          "sheer pina barong tagalog with ornate kalado embroidery and translucent texture",
+        fabrics: ["piña", "jusi", "organza"],
         defaultColor: "#f6e8c3",
-      },
-      {
-        id: "barong_modern",
-        name: "Modern Tailored Barong",
-        detail: "Slim fit, geometric embroidery",
-        prompt: "modern tailored barong with geometric embroidery panels and hidden buttons",
-        fabrics: ["jusi", "linen"],
-        defaultColor: "#d9c5a0",
       },
     ],
   },
@@ -131,7 +124,7 @@ const FABRIC_LIBRARY = {
 };
 
 const COLORS = ["#1a1a1a", "#2b6cb0", "#8b0000", "#228b22", "#4a4a4a", "#d69e2e", "#f6e8c3"];
-const PATTERNS = ["solid", "stripes", "checked", "floral", "embroidered"];
+const PATTERNS = ["solid", "stripes", "checked", "floral"];
 
 const getDefaultVariantId = (categoryId) => {
   const category = CLOTHING_CATALOG.find((c) => c.id === categoryId);
@@ -144,6 +137,7 @@ export default function App() {
   const [customization, setCustomization] = useState({
     clothingType: "coat",
     variantId: getDefaultVariantId("coat"),
+    gender: "unisex",
     fabricType: "cotton",
     pattern: "solid",
     color: "#1a1a1a",
