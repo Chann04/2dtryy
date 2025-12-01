@@ -444,9 +444,11 @@ export default function CustomizationPage({
 
           
           <div className="action-buttons">
-            <button className="btn-back" onClick={onBack}>
-              ← Back
-            </button>
+            {typeof onBack === "function" && (
+              <button className="btn-back" onClick={onBack}>
+                ← Back
+              </button>
+            )}
             <button className="btn-next" onClick={handleSave}>
               Continue to Review →
             </button>

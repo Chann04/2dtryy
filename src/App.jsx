@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import "./App.css";
-import ShopPage from "./pages/ShopPage";
 import CustomizationPage from "./pages/CustomizationPage";
 import ReviewPage from "./pages/ReviewPage";
 
@@ -132,8 +131,7 @@ const getDefaultVariantId = (categoryId) => {
 };
 
 export default function App() {
-  const [page, setPage] = useState("shop"); // shop, customize, review
-  const [selectedClothing, setSelectedClothing] = useState(null);
+  const [page, setPage] = useState("customize"); // customize, review
   const [customization, setCustomization] = useState({
     clothingType: "coat",
     variantId: getDefaultVariantId("coat"),
@@ -148,19 +146,6 @@ export default function App() {
   });
   const [fabricSampleFile, setFabricSampleFile] = useState(null);
   const [customizationImageFile, setCustomizationImageFile] = useState(null);
-
-  const handleSelectClothing = (categoryId) => {
-    const nextVariant = getDefaultVariantId(categoryId);
-    setSelectedClothing(categoryId);
-    setCustomization((prev) => ({
-      ...prev,
-      clothingType: categoryId,
-      variantId: nextVariant || prev.variantId,
-      aiImageUrl: "",
-      generatedPrompt: "",
-    }));
-    setPage("customize");
-  };
 
   const handleSaveCustomization = (customConfig) => {
     setCustomization(customConfig);
@@ -180,8 +165,7 @@ export default function App() {
       `✅ Order confirmed!\n\nClothing: ${customization.clothingType}\nColor: ${customization.color}\nFabric: ${customization.fabricType}\n\nFabric sample uploaded: ${fabricSampleFile ? "Yes" : "No"}\nCustomization image uploaded: ${customizationImageFile ? "Yes" : "No"}`
     );
     // Reset
-    setPage("shop");
-    setSelectedClothing(null);
+    setPage("customize");
     setFabricSampleFile(null);
     setCustomizationImageFile(null);
   };
@@ -197,44 +181,32 @@ export default function App() {
           </div>
           <nav className="nav-links">
             <button
-              className={`nav-btn ${page === "shop" ? "active" : ""}`}
-              onClick={() => setPage("shop")}
+              className={`nav-btn ${page === "customize" ? "active" : ""}`}
+              onClick={() => setPage("customize")}
             >
-              Shop
+              Customize
             </button>
-            {selectedClothing && (
-              <button
-                className={`nav-btn ${page === "customize" ? "active" : ""}`}
-                onClick={() => setPage("customize")}
-              >
-                Customize
-              </button>
-            )}
-            {selectedClothing && (
-              <button
-                className={`nav-btn ${page === "review" ? "active" : ""}`}
-                onClick={() => setPage("review")}
-              >
-                Review
-              </button>
-            )}
+            <button
+              className={`nav-btn ${page === "review" ? "active" : ""}`}
+              onClick={() => setPage("review")}
+            >
+              Review
+            </button>
           </nav>
         </div>
       </header>
 
       {/* Pages */}
       <main className="app-main">
-        {page === "shop" && <ShopPage clothingTypes={CLOTHING_CATALOG} onSelect={handleSelectClothing} />}
         {page === "customize" && (
           <CustomizationPage
-            selectedClothing={selectedClothing}
+            selectedClothing={customization.clothingType}
             catalog={CLOTHING_CATALOG}
             fabricLibrary={FABRIC_LIBRARY}
             colors={COLORS}
             patterns={PATTERNS}
             initialCustomization={customization}
             onSave={handleSaveCustomization}
-            onBack={() => setPage("shop")}
           />
         )}
         {page === "review" && (
