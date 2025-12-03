@@ -131,7 +131,7 @@ const getDefaultVariantId = (categoryId) => {
 };
 
 export default function App() {
-  const [page, setPage] = useState("customize"); // customize, review
+  const [page, setPage] = useState("customize"); // customize, review, debug
   const [customization, setCustomization] = useState({
     clothingType: "coat",
     variantId: getDefaultVariantId("coat"),
@@ -192,6 +192,13 @@ export default function App() {
             >
               Review
             </button>
+            <button
+              className={`nav-btn ${page === "debug" ? "active" : ""}`}
+              onClick={() => setPage("debug")}
+              style={{ background: '#ff4444' }}
+            >
+              🔧 Debug 3D
+            </button>
           </nav>
         </div>
       </header>
@@ -221,7 +228,110 @@ export default function App() {
             onBack={() => setPage("customize")}
           />
         )}
+        {page === "debug" && (
+          <DebugPage />
+        )}
       </main>
+    </div>
+  );
+}
+
+// Simple Debug Component
+function DebugPage() {
+  const [status, setStatus] = React.useState({
+    three: '⏳ Checking...',
+    file: '⏳ Checking...',
+    details: []
+  });
+
+  React.useEffect(() => {
+    const checkEverything = async () => {
+      const details = [];
+      
+      // Check Three.js
+      try {
+        await import('three');
+        await import('three-stdlib');
+        setStatus(prev => ({ ...prev, three: '✅ Loaded' }));
+        details.push('✅ Three.js and three-stdlib are installed');
+      } catch (err) {
+        setStatus(prev => ({ ...prev, three: '❌ Not found' }));
+        details.push(`❌ Three.js error: ${err.message}`);
+        details.push('💡 Run: npm install three three-stdlib');
+      }
+
+      // Check file
+      try {
+        const response = await fetch('/models/Suit.glb');
+        if (response.ok) {
+          const blob = await response.blob();
+          const size = (blob.size / 1024).toFixed(2);
+          setStatus(prev => ({ ...prev, file: '✅ Found' }));
+          details.push(`✅ Suit.glb found (${size} KB)`);
+        } else {
+          setStatus(prev => ({ ...prev, file: '❌ Not found' }));
+          details.push(`❌ Suit.glb returned status ${response.status}`);
+          details.push('💡 Make sure file is in: public/models/Suit.glb');
+        }
+      } catch (err) {
+        setStatus(prev => ({ ...prev, file: '❌ Error' }));
+        details.push(`❌ Cannot access file: ${err.message}`);
+        details.push('💡 File must be in public/models/Suit.glb');
+      }
+
+      setStatus(prev => ({ ...prev, details }));
+    };
+
+    checkEverything();
+  }, []);
+
+  return (
+    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
+      <h2>🔧 3D Model Debug</h2>
+      
+      <div style={{ 
+        background: 'white', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginBottom: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}>
+        <h3>Status Check:</h3>
+        <div style={{ fontSize: '18px', marginBottom: '10px' }}>
+          <strong>Three.js:</strong> {status.three}
+        </div>
+        <div style={{ fontSize: '18px', marginBottom: '10px' }}>
+          <strong>Suit.glb:</strong> {status.file}
+        </div>
+      </div>
+
+      <div style={{ 
+        background: '#1e1e1e', 
+        color: '#d4d4d4', 
+        padding: '20px', 
+        borderRadius: '8px',
+        fontFamily: 'monospace',
+        fontSize: '14px'
+      }}>
+        <h3 style={{ color: '#d4d4d4' }}>Details:</h3>
+        {status.details.map((detail, i) => (
+          <div key={i} style={{ marginBottom: '8px' }}>{detail}</div>
+        ))}
+      </div>
+
+      <div style={{ 
+        marginTop: '20px', 
+        padding: '20px', 
+        background: '#fff3cd', 
+        borderRadius: '8px' 
+      }}>
+        <h4>Quick Fixes:</h4>
+        <ol>
+          <li><strong>If Three.js is missing:</strong> Run <code>npm install three three-stdlib</code></li>
+          <li><strong>If Suit.glb is not found:</strong> Make sure the file is at <code>public/models/Suit.glb</code></li>
+          <li><strong>After fixing:</strong> Restart your dev server (<code>npm run dev</code>)</li>
+        </ol>
+      </div>
     </div>
   );
 }
