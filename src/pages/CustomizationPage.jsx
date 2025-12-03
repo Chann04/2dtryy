@@ -18,9 +18,30 @@ export default function CustomizationPage({
   onSave,
   onBack,
 }) {
-  const [clothingType, setClothingType] = useState(initialCustomization.clothingType || "suits");
-  const [variantId, setVariantId] = useState(initialCustomization.variantId || "double-breasted");
-  const [gender, setGender] = useState(initialCustomization.gender || "male");
+  // Ensure initial values are never empty strings
+  const getInitialClothingType = () => {
+    const val = initialCustomization.clothingType;
+    return (val && typeof val === 'string' && val.trim()) ? val.trim() : "suits";
+  };
+  const getInitialVariantId = () => {
+    const val = initialCustomization.variantId;
+    return (val && typeof val === 'string' && val.trim()) ? val.trim() : "double-breasted";
+  };
+  const getInitialGender = () => {
+    const val = initialCustomization.gender;
+    return (val && typeof val === 'string' && val.trim()) ? val.trim() : "male";
+  };
+  
+  const [clothingType, setClothingType] = useState(getInitialClothingType());
+  const [variantId, setVariantId] = useState(getInitialVariantId());
+  const [gender, setGender] = useState(getInitialGender());
+  
+  console.log('🎯 [CustomizationPage] Initial state:', {
+    clothingType,
+    variantId,
+    gender,
+    initialCustomization
+  });
   const [fabricType, setFabricType] = useState(initialCustomization.fabricType || "wool");
   const [pattern, setPattern] = useState(initialCustomization.pattern || "solid");
   const [color, setColor] = useState(initialCustomization.color || "#1a1a1a");
@@ -29,6 +50,17 @@ export default function CustomizationPage({
 
   const activeCategory = catalog.find(c => c.id === clothingType);
   const activeVariant = activeCategory?.variants.find(v => v.id === variantId) || activeCategory?.variants[0];
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('🔄 [CustomizationPage] State changed:', {
+      clothingType,
+      variantId,
+      gender,
+      activeCategory: activeCategory?.id,
+      activeVariant: activeVariant?.id
+    });
+  }, [clothingType, variantId, gender, activeCategory, activeVariant]);
 
   // Auto-set gender for barong
   useEffect(() => {
@@ -58,25 +90,94 @@ export default function CustomizationPage({
 
   // Dynamic model path - matches your exact GLB filenames
   const modelPath = useMemo(() => {
-    if (clothingType === "barong") {
-      return `/models/barong_male.glb`;
+    // Log raw inputs BEFORE validation
+    console.log('🔍 [CustomizationPage] Raw inputs BEFORE validation:', {
+      clothingType: clothingType,
+      clothingTypeType: typeof clothingType,
+      clothingTypeLength: clothingType?.length,
+      variantId: variantId,
+      variantIdType: typeof variantId,
+      gender: gender,
+      genderType: typeof gender
+    });
+    
+    // Validate inputs - handle empty strings, null, undefined more robustly
+    const validClothingType = (clothingType && typeof clothingType === 'string' && clothingType.trim()) ? clothingType.trim() : "suits";
+    const validGender = (gender && typeof gender === 'string' && gender.trim()) ? gender.trim() : "male";
+    const validVariantId = (variantId && typeof variantId === 'string' && variantId.trim()) ? variantId.trim() : "double-breasted";
+    
+    console.log('🔍 [CustomizationPage] Validated inputs:', {
+      validClothingType,
+      validVariantId,
+      validGender
+    });
+    
+    let path;
+    let modelName = ""; // Initialize outside if/else to ensure it's always set
+    
+    if (validClothingType === "barong") {
+      path = `/models/barong_men.glb`;
+      console.log('✅ [CustomizationPage] Barong path:', path);
+      return path;
+    } else {
+      const genderSuffix = validGender === "female" ? "_women" : "_men";
+
+      // Determine modelName based on clothingType
+      if (validClothingType === "coats") {
+        modelName = validVariantId === "trench" ? "trenchcoat" : "doublebreasted";
+      } else if (validClothingType === "suits") {
+        modelName = validVariantId === "tuxedo" ? "eveningtuxedo" : "doublebreastedsuit";
+      } else if (validClothingType === "trousers") {
+        modelName = validVariantId === "wideleg" ? "wideleg" : "formaltrouser";
+      } else {
+        // Fallback: if clothingType is unknown, default to suits
+        console.warn(`⚠️ [CustomizationPage] Unknown clothingType: "${validClothingType}", defaulting to suits`);
+        modelName = validVariantId === "tuxedo" ? "eveningtuxedo" : "doublebreastedsuit";
+      }
+
+      // CRITICAL: Safety check - ensure modelName is NEVER empty
+      if (!modelName || modelName.trim() === "") {
+        console.error(`❌ [CustomizationPage] CRITICAL: modelName is empty!`);
+        console.error(`❌ [CustomizationPage] clothingType: "${validClothingType}" (type: ${typeof validClothingType})`);
+        console.error(`❌ [CustomizationPage] variantId: "${validVariantId}" (type: ${typeof validVariantId})`);
+        // Force a safe default
+        modelName = "doublebreastedsuit";
+        console.warn(`⚠️ [CustomizationPage] Forced modelName to: "${modelName}"`);
+      }
+
+      path = `/models/${modelName}${genderSuffix}.glb`;
+      
+      // Final validation: ensure path doesn't contain _men.glb or _women.glb without prefix
+      if (path.includes('/models/_men.glb') || path.includes('/models/_women.glb')) {
+        console.error(`❌ [CustomizationPage] CRITICAL: Generated invalid path: "${path}"`);
+        console.error(`❌ [CustomizationPage] modelName was: "${modelName}"`);
+        // Force a safe path
+        path = `/models/doublebreastedsuit${genderSuffix}.glb`;
+        console.warn(`⚠️ [CustomizationPage] Forced path to: "${path}"`);
+      }
     }
-
-    const genderSuffix = gender === "female" ? "_women" : "_men";
-    let modelName = "";
-
-    if (clothingType === "coats") {
-      // Your files: "double breasted men.glb" or "trench coat women.glb"
-      modelName = variantId === "trench" ? "trenchcoat" : "doublebreasted";
-    } else if (clothingType === "suits") {
-      // Your files: "doublebreastedsuit_men.glb" or "eveningtuxedo_women.glb"
-      modelName = variantId === "tuxedo" ? "eveningtuxedo" : "doublebreastedsuit";
-    } else if (clothingType === "trousers") {
-      // Your files: "formaltrouser_men.glb" or "wideleg_women.glb"
-      modelName = variantId === "wideleg" ? "wideleg" : "formaltrouser";
+    
+    // Debug logging
+    console.log('🔍 [CustomizationPage] Model path constructed:', {
+      clothingType: validClothingType,
+      variantId: validVariantId,
+      gender: validGender,
+      modelName: modelName,
+      finalPath: path,
+      fullURL: window.location.origin + path
+    });
+    
+    // ABSOLUTE FINAL SAFETY CHECK: Never return a path with _men.glb or _women.glb without prefix
+    if (!path || path === '/models/_men.glb' || path === '/models/_women.glb' || 
+        path.match(/\/models\/_(men|women)\.glb$/)) {
+      console.error(`❌ [CustomizationPage] ABSOLUTE FINAL CHECK FAILED: Invalid path "${path}"`);
+      console.error(`❌ [CustomizationPage] Forcing safe default path`);
+      const safeGenderSuffix = (validGender === "female") ? "_women" : "_men";
+      path = `/models/doublebreastedsuit${safeGenderSuffix}.glb`;
+      console.warn(`⚠️ [CustomizationPage] Forced safe path: "${path}"`);
     }
-
-    return `/models/${modelName}${genderSuffix}.glb`;
+    
+    return path;
   }, [clothingType, variantId, gender]);
 
   // Available fabrics based on category
@@ -99,16 +200,47 @@ export default function CustomizationPage({
           </div>
 
           <div className="ai-preview-box">
-            <Clothing3DViewer
-              key={modelPath}
-              modelPath={modelPath}
-              color={color}
-              pattern={pattern}
-              fabricType={fabricType}
-              variantName={activeVariant?.name}
-              clothingType={activeCategory?.label}
-              clothingFit={clothingFit}
-            />
+            {modelPath && 
+             typeof modelPath === 'string' && 
+             modelPath.trim() !== '' && 
+             !modelPath.match(/\/models\/_(men|women)\.glb$/) &&
+             modelPath !== '/models/_men.glb' &&
+             modelPath !== '/models/_women.glb' ? (
+              <Clothing3DViewer
+                key={modelPath}
+                modelPath={modelPath}
+                color={color}
+                pattern={pattern}
+                fabricType={fabricType}
+                variantName={activeVariant?.name}
+                clothingType={activeCategory?.label}
+                clothingFit={clothingFit}
+              />
+            ) : (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                padding: '20px',
+                textAlign: 'center',
+                background: 'rgba(255,255,255,0.95)',
+                borderRadius: '12px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>⚠️</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#d32f2f', marginBottom: '10px' }}>
+                    Invalid Model Path
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#666' }}>
+                    Waiting for valid model configuration...
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
+                    Path: {modelPath || '(empty)'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

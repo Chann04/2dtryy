@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { GLTFLoader } from 'three-stdlib';
+import { RGBELoader } from 'three-stdlib';
 
 const Clothing3DViewer = ({ 
   modelPath = '/models/Suit.glb', 
@@ -14,15 +15,61 @@ const Clothing3DViewer = ({
   width = '100%',
   height = '500px'
 }) => {
+  // Log all received props
+  console.log('🎯 [Clothing3DViewer] Received props:', {
+    modelPath,
+    modelPathType: typeof modelPath,
+    modelPathLength: modelPath?.length,
+    color,
+    pattern,
+    fabricType,
+    variantName,
+    clothingType,
+    clothingFit
+  });
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
   const controlsRef = useRef(null);
   const modelRef = useRef(null);
+  const floorRef = useRef(null);
   const animationIdRef = useRef(null);
+  const initAttemptRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Helper function to center camera on model - fills ~80% of viewport
+  const centerCameraOnModel = useCallback((model, camera, controls, containerHeight) => {
+    if (!model || !camera || !controls) return;
+
+    // Calculate bounding box of the model
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    // Get the maximum dimension
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Calculate camera distance to fit model in ~80% of viewport
+    const fov = camera.fov * (Math.PI / 180);
+    const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) / 0.8; // 0.8 = 80% fill
+    
+    // Position camera in front of model
+    camera.position.set(center.x, center.y, center.z + cameraDistance);
+    camera.lookAt(center);
+    
+    // Update controls target to model center
+    controls.target.copy(center);
+    controls.update();
+    
+    console.log('📷 Camera centered on model:', {
+      center: { x: center.x.toFixed(2), y: center.y.toFixed(2), z: center.z.toFixed(2) },
+      modelSize: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
+      cameraDistance: cameraDistance.toFixed(2)
+    });
+  }, []);
 
   // Generate pattern texture with NEUTRAL base (not colored)
   const generatePatternTexture = (patternType) => {
@@ -176,196 +223,341 @@ const Clothing3DViewer = ({
     return texture;
   };
 
-  // Initialize 3D scene
+  // Initialize 3D scene with retry logic for proper dimensions
   useEffect(() => {
     if (!containerRef.current) return;
-
-    console.log('🎬 Initializing 3D scene...');
-
-    // Create scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
-    sceneRef.current = scene;
-
-    // Create camera
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 1.5, 5);
-    camera.lookAt(0, 1, 0);
-    cameraRef.current = camera;
-    console.log('✅ Camera at:', camera.position.x, camera.position.y, camera.position.z);
-
-    // Create renderer
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: true 
-    });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // Enhanced lighting setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    keyLight.position.set(5, 10, 7);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
-    scene.add(keyLight);
-
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-    fillLight.position.set(-5, 5, -5);
-    scene.add(fillLight);
-
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    rimLight.position.set(0, 5, -10);
-    scene.add(rimLight);
-
-    // Add controls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 2;
-    controls.maxDistance = 10;
-    controls.target.set(0, 1, 0);
-    controls.maxPolarAngle = Math.PI / 2 + 0.3;
-    controlsRef.current = controls;
-
-    // Load model
-    const loader = new GLTFLoader();
-    console.log('📦 Loading model from:', modelPath);
-    console.log('📦 Full URL:', window.location.origin + modelPath);
     
-    loader.load(
-      modelPath,
-      (gltf) => {
-        console.log('✅ Model loaded successfully!');
-        
-        const model = gltf.scene;
-        modelRef.current = model;
+    // CRITICAL: Validate modelPath BEFORE doing anything
+    if (!modelPath || typeof modelPath !== 'string' || modelPath.trim() === '') {
+      console.error('❌ [Clothing3DViewer] useEffect: Invalid modelPath, skipping initialization:', modelPath);
+      setError(`Invalid model path: "${modelPath}". Please check your configuration.`);
+      setLoading(false);
+      return;
+    }
+    
+    // Check for invalid path patterns BEFORE initializing scene
+    if (modelPath.match(/\/models\/_(men|women)\.glb$/) || 
+        modelPath === '/models/_men.glb' || 
+        modelPath === '/models/_women.glb') {
+      console.error('❌ [Clothing3DViewer] useEffect: Invalid path pattern detected:', modelPath);
+      setError(`Invalid model path: "${modelPath}". Model name is missing.`);
+      setLoading(false);
+      return;
+    }
 
-        // Get bounding box for proper scaling
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        
-        console.log('📏 Model size:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
-        console.log('📍 Model center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
+    // Function to initialize the scene once we have valid dimensions
+    const initScene = () => {
+      // Get container dimensions - use fallbacks if 0
+      let containerWidth = containerRef.current.clientWidth;
+      let containerHeight = containerRef.current.clientHeight;
+      
+      console.log('📐 Container dimensions (attempt #' + initAttemptRef.current + '):', containerWidth, 'x', containerHeight);
+      
+      // If dimensions are still 0, retry with requestAnimationFrame (up to 10 attempts)
+      if ((containerWidth === 0 || containerHeight === 0) && initAttemptRef.current < 10) {
+        initAttemptRef.current++;
+        console.log('⏳ Waiting for container layout... retry #' + initAttemptRef.current);
+        requestAnimationFrame(initScene);
+        return;
+      }
+      
+      // Use fallback dimensions if still 0 after retries
+      if (containerWidth === 0) {
+        containerWidth = 600;
+        console.warn('⚠️ Using fallback width: 600px');
+      }
+      if (containerHeight === 0) {
+        containerHeight = 500;
+        console.warn('⚠️ Using fallback height: 500px');
+      }
 
-        // Scale to fit viewport nicely
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 2.5 / maxDim;
-        model.scale.setScalar(scale);
-        
-        console.log('🔍 Calculated scale:', scale.toFixed(4));
-        
-        // Center model at origin
-        const scaledCenter = center.clone().multiplyScalar(scale);
-        model.position.set(
-          -scaledCenter.x,
-          -scaledCenter.y + 0.5, // Slight lift for better framing
-          -scaledCenter.z
-        );
-        
-        console.log('📌 Model positioned at:', model.position.x.toFixed(2), model.position.y.toFixed(2), model.position.z.toFixed(2));
+      console.log('🎬 Initializing 3D scene...');
+      console.log('🎬 [Clothing3DViewer] useEffect triggered with modelPath:', modelPath);
+      console.log('📐 Final dimensions:', containerWidth, 'x', containerHeight);
 
-        // Apply initial materials
-        let meshCount = 0;
-        model.traverse((child) => {
-          if (child.isMesh) {
-            meshCount++;
-            child.castShadow = true;
-            child.receiveShadow = true;
-            
-            // Ensure material exists and is visible
-            if (!child.material) {
+      // Create scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf5f5f5);
+      sceneRef.current = scene;
+
+      // Create camera with valid dimensions
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        containerWidth / containerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 0, 5);
+      camera.lookAt(0, -2, 0);
+      cameraRef.current = camera;
+      console.log('✅ Camera at:', camera.position.x, camera.position.y, camera.position.z);
+
+      // Create renderer with HIGH QUALITY settings
+      const renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        alpha: false,
+        powerPreference: "high-performance",
+        precision: "highp" // High precision for better quality
+      });
+      
+      renderer.setSize(containerWidth, containerHeight);
+      // Use FULL device pixel ratio for sharp, crisp rendering
+      renderer.setPixelRatio(window.devicePixelRatio);
+      
+      // Enhanced shadow settings for precise rendering
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0; // Neutral exposure for accurate colors
+      renderer.physicallyCorrectLights = true; // Physically accurate lighting
+      renderer.setClearColor(0xf0f0f0, 1); // Slightly darker for contrast
+      
+      // Ensure canvas is visible and on top
+      renderer.domElement.style.display = 'block';
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.zIndex = '1';
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      
+      // Clear container before appending
+      while (containerRef.current.firstChild) {
+        containerRef.current.removeChild(containerRef.current.firstChild);
+      }
+      
+      containerRef.current.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
+      
+      console.log('🎨 Renderer created:', {
+        width: containerWidth,
+        height: containerHeight,
+        pixelRatio: renderer.getPixelRatio(),
+        alpha: false
+      });
+      
+      setIsReady(true);
+
+      // ========== PROFESSIONAL STUDIO 3-POINT LIGHTING ==========
+      
+      // Soft ambient fill - provides base illumination
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambientLight);
+      
+      // Hemisphere light for natural sky/ground color variation
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe0e0e0, 0.6);
+      hemiLight.position.set(0, 20, 0);
+      scene.add(hemiLight);
+
+      // KEY LIGHT - Main light source (simulates window/softbox)
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+      keyLight.position.set(5, 8, 8);
+      keyLight.castShadow = true;
+      // High-resolution shadow map for crisp shadows
+      keyLight.shadow.mapSize.width = 4096;
+      keyLight.shadow.mapSize.height = 4096;
+      keyLight.shadow.camera.near = 0.1;
+      keyLight.shadow.camera.far = 50;
+      keyLight.shadow.camera.left = -10;
+      keyLight.shadow.camera.right = 10;
+      keyLight.shadow.camera.top = 10;
+      keyLight.shadow.camera.bottom = -10;
+      keyLight.shadow.bias = -0.0001; // Reduce shadow acne
+      keyLight.shadow.normalBias = 0.02;
+      scene.add(keyLight);
+
+      // FILL LIGHT - Softens shadows on opposite side
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      fillLight.position.set(-6, 4, 4);
+      fillLight.castShadow = false; // Only key light casts shadows
+      scene.add(fillLight);
+
+      // RIM/BACK LIGHT - Creates edge definition and separation
+      const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+      rimLight.position.set(0, 6, -8);
+      scene.add(rimLight);
+      
+      // ACCENT LIGHT - Top-down for fabric highlight
+      const topLight = new THREE.DirectionalLight(0xffffff, 0.4);
+      topLight.position.set(0, 12, 0);
+      scene.add(topLight);
+
+      // ========== SHADOW-RECEIVING FLOOR ==========
+      const floorGeometry = new THREE.PlaneGeometry(50, 50);
+      const floorMaterial = new THREE.ShadowMaterial({
+        opacity: 0.15, // Subtle shadow
+        color: 0x000000
+      });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -3; // Position below model
+      floor.receiveShadow = true;
+      scene.add(floor);
+      floorRef.current = floor;
+
+      // ========== ORBIT CONTROLS with IMPROVED ZOOM ==========
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      // Allow close zoom for fabric detail inspection
+      controls.minDistance = 0.5;  // Very close for button/fabric details
+      controls.maxDistance = 15;   // Reasonable max distance
+      controls.target.set(0, 0, 0);
+      controls.maxPolarAngle = Math.PI / 2 + 0.3;
+      controls.minPolarAngle = 0.1; // Prevent going completely overhead
+      controls.enablePan = true;
+      controls.panSpeed = 0.8;
+      controls.rotateSpeed = 0.8;
+      controls.zoomSpeed = 1.2; // Slightly faster zoom
+      controlsRef.current = controls;
+
+      // Load model using Three.js GLTFLoader (following threejs.org documentation pattern)
+      // Reference: https://threejs.org/docs/#examples/en/loaders/GLTFLoader
+      const loader = new GLTFLoader();
+      
+      loader.load(
+        modelPath,
+        // onLoad callback - called when model is successfully loaded
+        (gltf) => {
+          const model = gltf.scene;
+          modelRef.current = model;
+
+          // Initial scale - will be adjusted by auto-center
+          model.scale.set(5, 5, 5);
+          model.position.set(0, 0, 0);
+          
+          // Apply HIGH-QUALITY materials with proper fabric properties
+          const fabricProps = {
+            wool:     { roughness: 0.85, metalness: 0.0, envMapIntensity: 0.3 },
+            cashmere: { roughness: 0.80, metalness: 0.02, envMapIntensity: 0.5 },
+            cotton:   { roughness: 0.88, metalness: 0.0, envMapIntensity: 0.2 },
+            linen:    { roughness: 0.92, metalness: 0.0, envMapIntensity: 0.2 },
+            silk:     { roughness: 0.20, metalness: 0.15, envMapIntensity: 1.2 },
+            velvet:   { roughness: 0.95, metalness: 0.0, envMapIntensity: 0.4 },
+            tweed:    { roughness: 0.90, metalness: 0.01, envMapIntensity: 0.25 },
+            piña:     { roughness: 0.40, metalness: 0.05, envMapIntensity: 1.0 },
+            jusi:     { roughness: 0.45, metalness: 0.08, envMapIntensity: 0.9 },
+            organza:  { roughness: 0.25, metalness: 0.12, envMapIntensity: 1.4 },
+          };
+          
+          const fabric = fabricProps[fabricType] || fabricProps.wool;
+          
+          // Traverse model and apply HIGH-QUALITY materials with shadows
+          model.traverse((child) => {
+            if (child.isMesh) {
+              // Create MeshStandardMaterial with enhanced settings
               child.material = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                roughness: 0.8,
-                metalness: 0.1
+                color: color,
+                roughness: fabric.roughness,
+                metalness: fabric.metalness,
+                envMapIntensity: fabric.envMapIntensity,
+                side: THREE.DoubleSide,
+                flatShading: false, // Smooth shading for fabric
               });
-            } else {
-              // If material exists, make sure it's a standard material
-              if (!child.material.isMeshStandardMaterial) {
-                const oldColor = child.material.color ? child.material.color.getHex() : 0xffffff;
-                child.material = new THREE.MeshStandardMaterial({
-                  color: oldColor,
-                  roughness: 0.8,
-                  metalness: 0.1
-                });
+              // Enable shadows on ALL meshes
+              child.castShadow = true;
+              child.receiveShadow = true;
+              
+              // Ensure geometry normals are computed for proper lighting
+              if (child.geometry) {
+                child.geometry.computeVertexNormals();
               }
             }
-            
-            // Make sure material is double-sided and visible
-            child.material.side = THREE.DoubleSide;
-            child.material.transparent = false;
-            child.material.opacity = 1;
-            child.material.needsUpdate = true;
-            child.visible = true;
-            child.frustumCulled = false; // Prevent culling issues
-            
-            console.log(`  Mesh ${meshCount}:`, child.name, 'material:', child.material.type, 'color:', child.material.color?.getHexString());
+          });
+
+          // Add model to scene
+          scene.add(model);
+          
+          // AUTO-CENTER: Calculate bounding box and position camera to fill ~80% viewport
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          
+          // Position model so its center is at origin
+          model.position.sub(center);
+          model.position.y += size.y / 2 - 1; // Raise slightly above floor
+          
+          // Update floor position
+          if (floorRef.current) {
+            floorRef.current.position.y = model.position.y - size.y / 2 - 0.1;
           }
-        });
-        
-        console.log(`✅ Prepared ${meshCount} meshes`);
-
-        scene.add(model);
-        setLoading(false);
-        setError(null);
-      },
-      (progress) => {
-        const percent = Math.round((progress.loaded / progress.total) * 100);
-        if (progress.total > 0) {
-          console.log(`📊 Loading: ${percent}%`);
+          
+          // Calculate camera distance for 80% viewport fill
+          const fov = camera.fov * (Math.PI / 180);
+          const cameraZ = (maxDim / 0.8) / (2 * Math.tan(fov / 2));
+          
+          // Position camera
+          camera.position.set(0, size.y * 0.3, cameraZ);
+          camera.lookAt(0, size.y * 0.2, 0);
+          
+          // Update controls target
+          controls.target.set(0, size.y * 0.2, 0);
+          controls.update();
+          
+          console.log('📷 Auto-centered camera:', {
+            modelSize: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
+            cameraZ: cameraZ.toFixed(2),
+            modelCenter: { x: center.x.toFixed(2), y: center.y.toFixed(2), z: center.z.toFixed(2) }
+          });
+          
+          setLoading(false);
+          setError(null);
+          console.log('✅ Model loaded with studio lighting and auto-centering!');
+        },
+        // onProgress callback - called during loading
+        (progress) => {
+          if (progress.total > 0) {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            console.log(`📊 Loading: ${percent}%`);
+          }
+        },
+        // onError callback - called if loading fails
+        (loadError) => {
+          console.error('❌ Error loading model:', loadError);
+          setError(`Failed to load model: ${loadError.message || 'Unknown error'}`);
+          setLoading(false);
         }
-      },
-      (error) => {
-        console.error('❌ Error loading model:', error);
-        setError(`Failed to load model: ${error.message}`);
-        setLoading(false);
-      }
-    );
+      );
 
-    // Animation loop
-    const animate = () => {
-      animationIdRef.current = requestAnimationFrame(animate);
+      // Animation loop
+      const animate = () => {
+        animationIdRef.current = requestAnimationFrame(animate);
+        
+        if (controlsRef.current) {
+          controlsRef.current.update();
+        }
+        
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          // Clear and render the scene
+          rendererRef.current.clear();
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
+      };
       
-      if (controlsRef.current) {
-        controlsRef.current.update();
-      }
-      
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
+      // Start animation loop
+      console.log('🎬 Starting animation loop...');
+      animate();
     };
-    animate();
 
-    // Handle resize
+    // Handle resize - defined outside initScene for cleanup access
     const handleResize = () => {
       if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
       
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
+      const w = containerRef.current.clientWidth || 600;
+      const h = containerRef.current.clientHeight || 500;
       
-      cameraRef.current.aspect = width / height;
+      cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(width, height);
+      rendererRef.current.setSize(w, h);
     };
     
     window.addEventListener('resize', handleResize);
+    
+    // Reset attempt counter and start initialization
+    initAttemptRef.current = 0;
+    initScene();
 
     // Cleanup
     return () => {
@@ -376,19 +568,57 @@ const Clothing3DViewer = ({
         cancelAnimationFrame(animationIdRef.current);
       }
       
+      // Dispose of model geometry and materials
+      if (modelRef.current) {
+        modelRef.current.traverse((child) => {
+          if (child.isMesh) {
+            if (child.geometry) {
+              child.geometry.dispose();
+            }
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          }
+        });
+        
+        // Remove model from scene if it's still there
+        if (sceneRef.current && modelRef.current.parent === sceneRef.current) {
+          sceneRef.current.remove(modelRef.current);
+        }
+        modelRef.current = null;
+      }
+      
       if (containerRef.current && rendererRef.current?.domElement) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+        try {
+          containerRef.current.removeChild(rendererRef.current.domElement);
+        } catch (e) {
+          // Element may already be removed
+        }
       }
       
       if (controlsRef.current) {
         controlsRef.current.dispose();
       }
       
+      // Dispose floor
+      if (floorRef.current) {
+        if (floorRef.current.geometry) floorRef.current.geometry.dispose();
+        if (floorRef.current.material) floorRef.current.material.dispose();
+        if (sceneRef.current) sceneRef.current.remove(floorRef.current);
+        floorRef.current = null;
+      }
+      
       if (rendererRef.current) {
         rendererRef.current.dispose();
       }
+      
+      setIsReady(false);
     };
-  }, [modelPath]);
+  }, [modelPath, centerCameraOnModel]);
 
   // Update fabric properties, pattern, and color together
   useEffect(() => {
@@ -439,16 +669,27 @@ const Clothing3DViewer = ({
         }
 
         child.material.side = THREE.DoubleSide;
+        child.material.transparent = false;
+        child.material.opacity = 1;
+        child.material.wireframe = false; // Ensure wireframe is OFF for real clothing
         child.material.needsUpdate = true;
+        
+        // Ensure mesh is visible
+        child.visible = true;
       }
     });
 
-    console.log('✅ Material updated successfully');
+    console.log('✅ Material updated successfully - Color:', color, 'Fabric:', fabricType, 'Pattern:', pattern);
+    
+    // Force render after material update
+    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
   }, [fabricType, pattern, color]);
 
-  // Update fit (scale model)
+  // Update fit (scale model) and RE-CENTER CAMERA
   useEffect(() => {
-    if (!modelRef.current) return;
+    if (!modelRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
     
     console.log('📏 Updating fit to:', clothingFit);
     
@@ -459,29 +700,85 @@ const Clothing3DViewer = ({
     };
     
     const scale = fitScales[clothingFit] || fitScales.regular;
+    const model = modelRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
     
-    // Get the base scale (from initial model loading)
-    const box = new THREE.Box3().setFromObject(modelRef.current);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const baseScale = 2.5 / maxDim;
+    // Store current model world position before scaling
+    const currentWorldPos = new THREE.Vector3();
+    model.getWorldPosition(currentWorldPos);
     
-    modelRef.current.scale.set(
-      baseScale * scale.x,
-      baseScale * scale.y,
-      baseScale * scale.z
+    // Apply fit scale multiplier to current scale
+    const currentScale = model.scale.clone();
+    const baseScaleX = currentScale.x / (fitScales.regular.x || 1);
+    const baseScaleY = currentScale.y / (fitScales.regular.y || 1);
+    const baseScaleZ = currentScale.z / (fitScales.regular.z || 1);
+    
+    model.scale.set(
+      baseScaleX * scale.x,
+      baseScaleY * scale.y,
+      baseScaleZ * scale.z
     );
     
-    console.log(`✅ Applied ${clothingFit} fit scale:`, scale);
+    // Recalculate bounding box after scale change
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    if (maxDim > 0) {
+      // Update floor position based on new model bounds
+      if (floorRef.current) {
+        const modelBottom = box.min.y;
+        floorRef.current.position.y = modelBottom - 0.05;
+      }
+      
+      // RE-CENTER CAMERA on the new geometry
+      const fov = camera.fov * (Math.PI / 180);
+      const idealDistance = (maxDim / 0.8) / (2 * Math.tan(fov / 2));
+      
+      // Smoothly position camera to view the resized model
+      const targetY = center.y;
+      camera.position.set(0, targetY + size.y * 0.1, idealDistance);
+      camera.lookAt(center);
+      
+      // Update controls target to new center
+      controls.target.copy(center);
+      controls.update();
+      
+      console.log(`✅ Applied ${clothingFit} fit - Camera re-centered:`, {
+        scale: scale,
+        newSize: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
+        cameraDistance: idealDistance.toFixed(2)
+      });
+      
+      // Force render after changes
+      if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
+    } else {
+      console.warn('⚠️ Cannot update fit: invalid model dimensions');
+    }
   }, [clothingFit]);
 
+  // Parse height to ensure it's usable
+  const containerHeight = typeof height === 'number' ? `${height}px` : height;
+  
   return (
-    <div style={{ position: 'relative', width, height }}>
+    <div style={{ 
+      position: 'relative', 
+      width, 
+      height: containerHeight,
+      minHeight: '450px' // Ensure minimum height
+    }}>
       <div 
         ref={containerRef} 
         style={{ 
-          width: '100%', 
-          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           borderRadius: '12px',
           overflow: 'hidden',
           background: 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)'
